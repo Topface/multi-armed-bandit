@@ -86,25 +86,33 @@ class ReinforcementComparison extends AbstractPredisMultiArmedBandit {
         // TODO: "if tonumber(moveCount) == 0 then moveCount = 1 end" or "if tonumber(moveCount) == 0 then return end" ?
 
         $luaUpdater =
-"local moveCount = redis.call('hget', KEYS[1], KEYS[2])
+            "local moveCount = redis.call('hget', KEYS[1], KEYS[2])
+if tonumber(moveCount) == 0 then
+    redis.call('hincrby', KEYS[1], KEYS[3], ARGV[1])
+    return
+end
 redis.call('hset', KEYS[1], KEYS[2], 0)
-if tonumber(moveCount) == 0 then moveCount = 1 end
+local storedReward = redis.call('hget', KEYS[1], KEYS[3])
+if tonumber(storedReward) ~= 0 then
+    redis.call('hset', KEYS[1], KEYS[3], 0)
+end
+local reward = (ARGV[1] + storedReward) / moveCount
 
-local reward = ARGV[1] / moveCount
-local deltaReward = reward - redis.call('hget', KEYS[1], KEYS[3])
-local res = redis.call('hincrbyfloat', KEYS[1], KEYS[3], ARGV[2]*deltaReward)
-local newPref = redis.call('hincrbyfloat', KEYS[1], KEYS[4], ARGV[3]*deltaReward)
-redis.call('hset', KEYS[1], KEYS[5], math.exp(newPref/ARGV[4]))";
+local deltaReward = reward - redis.call('hget', KEYS[1], KEYS[4])
+local res = redis.call('hincrbyfloat', KEYS[1], KEYS[4], ARGV[2]*deltaReward)
+local newPref = redis.call('hincrbyfloat', KEYS[1], KEYS[5], ARGV[3]*deltaReward)
+redis.call('hset', KEYS[1], KEYS[6], math.exp(newPref/ARGV[4]))";
 
         //TODO: use EVALSHA or something
         return $this->PredisStorage->eval(
             $luaUpdater,
-            5,
+            6,
 /*1_______*/$this->predisHashKey,
 /*2_______*/$this->getChooseCountName($actionName),
-/*3_______*/$this->getReferenceRewardName(),
-/*4_______*/$this->getPreferenceName($actionName),
-/*5_______*/$this->getEPreferenceName($actionName),
+/*3_______*/$this->getStoredRewardName($actionName),
+/*4_______*/$this->getReferenceRewardName(),
+/*5_______*/$this->getPreferenceName($actionName),
+/*6_______*/$this->getEPreferenceName($actionName),
             $reward,
             $this->referenceRewardStep,
             $this->preferenceStep,

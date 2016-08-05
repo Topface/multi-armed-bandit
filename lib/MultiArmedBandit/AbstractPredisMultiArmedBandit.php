@@ -25,6 +25,10 @@ abstract class AbstractPredisMultiArmedBandit extends AbstractMultiArmedBandit {
         return $this->prefix . 'cc:' . $actionName;
     }
 
+    public function getStoredRewardName($actionName) {
+        return $this->prefix . 'sr:' . $actionName;
+    }
+
     /**
      * @param Client $PredisStorage
      * @param string $predisHashKey
@@ -42,5 +46,6 @@ abstract class AbstractPredisMultiArmedBandit extends AbstractMultiArmedBandit {
     
     public function initAction($actionName) {
         $this->PredisStorage->hset($this->predisHashKey, $this->getChooseCountName($actionName), 0);
+        $this->PredisStorage->hset($this->predisHashKey, $this->getStoredRewardName($actionName), 0);
     }
 }

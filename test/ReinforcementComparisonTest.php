@@ -28,6 +28,23 @@ class ReinforcementComparisonTest extends PHPUnit_Framework_TestCase {
         $this->predis->del($this->hash);
     }
 
+    /**
+     * @param $rc ReinforcementComparison
+     * @param $calls []
+     * @param $actions []
+     * @param $methodName string
+     */
+    private function EchoStats($rc, $calls, $actions, $methodName) {
+        echo "\n";
+        echo __CLASS__ . "::" . $methodName . "\n";
+        echo "Reference reward: " . $this->predis->hget($this->hash, $rc->getReferenceRewardName()) . "\n";
+        for ($i = 0; $i < count($calls); $i++) {
+            echo "Action $actions[$i]: $calls[$i] times \n";
+            echo " preference: " . $this->predis->hget($this->hash, $rc->getPreferenceName($actions[$i])) . "\n";
+            echo " e-preference: " . $this->predis->hget($this->hash, $rc->getEPreferenceName($actions[$i])) . "\n";
+        }
+    }
+
     public function testRandomizer() {
         $probs = [10, 10, 5];
         $checks = [0, 0, 0];
@@ -47,6 +64,7 @@ class ReinforcementComparisonTest extends PHPUnit_Framework_TestCase {
         $this->assertEquals('p:a', $rc->getPreferenceName('a'));
         $this->assertEquals('ep:a', $rc->getEPreferenceName('a'));
         $this->assertEquals('cc:a', $rc->getChooseCountName('a'));
+        $this->assertEquals('sr:a', $rc->getStoredRewardName('a'));
 
         $this->assertEquals(0, $this->predis->hget($this->hash, $rc->getReferenceRewardName()));
         $this->assertEquals(0, $this->predis->hget($this->hash, $rc->getPreferenceName('a')));
@@ -71,17 +89,25 @@ class ReinforcementComparisonTest extends PHPUnit_Framework_TestCase {
     public function testOneAction() {
         $rc = new ReinforcementComparison($this->predis, $this->hash, /*rr step*/1.0, /*starting rr*/50.0, /*p step*/0.1, /*t*/1.0);
         $rc->initAction('a');
+        $eps =1.0/1000/1000;
+
+        // 0 moves, reward. This is a corner case, which should happen rarely as move count should be higher than reward count.
+        // if `chooseCount` == 0 we store reward to `storedReward`, until next receiveReward() call
+        $rc->receiveReward('a', 100);
+        $this->assertEquals(0, $this->predis->hget($this->hash, $rc->getChooseCountName('a')));
+        $this->assertEquals(50, $this->predis->hget($this->hash, $rc->getReferenceRewardName()), '', $eps);
+        $this->assertEquals(0, $this->predis->hget($this->hash, $rc->getPreferenceName('a')), '', $eps);
+        $this->assertEquals(1, $this->predis->hget($this->hash, $rc->getEPreferenceName('a')), '', $eps);
 
         // One move, then reward
         $this->assertEquals(0, $rc->getBestActionIndex(['a']));
         $this->assertEquals(1, $this->predis->hget($this->hash, $rc->getChooseCountName('a')));
         $rc->receiveReward('a', 100);
 
-        $eps =1.0/1000/1000;
         $this->assertEquals(0, $this->predis->hget($this->hash, $rc->getChooseCountName('a')));
-        $this->assertEquals(100.0, $this->predis->hget($this->hash, $rc->getReferenceRewardName()), '', 100.0*$eps);
-        $this->assertEquals(5.0, $this->predis->hget($this->hash, $rc->getPreferenceName('a')), '', 5.0*$eps);
-        $this->assertEquals(exp(5.0), $this->predis->hget($this->hash, $rc->getEPreferenceName('a')), '', exp(5.0)*$eps);
+        $this->assertEquals(200.0, $this->predis->hget($this->hash, $rc->getReferenceRewardName()), '', 200.0*$eps);
+        $this->assertEquals(15.0, $this->predis->hget($this->hash, $rc->getPreferenceName('a')), '', 15.0*$eps);
+        $this->assertEquals(exp(15.0), $this->predis->hget($this->hash, $rc->getEPreferenceName('a')), '', exp(15.0)*$eps);
 
         // Two moves, then reward
         $this->assertEquals(0, $rc->getBestActionIndex(['a']));
@@ -90,24 +116,14 @@ class ReinforcementComparisonTest extends PHPUnit_Framework_TestCase {
         $this->assertEquals(2, $this->predis->hget($this->hash, $rc->getChooseCountName('a')));
         $rc->receiveReward('a', 100);
 
-        $eps =1.0/1000/1000;
         $this->assertEquals(0, $this->predis->hget($this->hash, $rc->getChooseCountName('a')));
         $this->assertEquals(50.0, $this->predis->hget($this->hash, $rc->getReferenceRewardName()), '', 50.0*$eps);
-        $this->assertEquals(0.0, $this->predis->hget($this->hash, $rc->getPreferenceName('a')), '', $eps);
-        $this->assertEquals(exp(0.0), $this->predis->hget($this->hash, $rc->getEPreferenceName('a')), '', exp(0.0)*$eps);
-
-        // 0 moves, reward. This is a corner case, which should happen rarely as move count should be higher than reward count.
-        // To resolve this problem we assume that moveCount == 1.
-        $rc->receiveReward('a', 100);
-        $eps =1.0/1000/1000;
-        $this->assertEquals(0, $this->predis->hget($this->hash, $rc->getChooseCountName('a')));
-        $this->assertEquals(100.0, $this->predis->hget($this->hash, $rc->getReferenceRewardName()), '', 100.0*$eps);
-        $this->assertEquals(5.0, $this->predis->hget($this->hash, $rc->getPreferenceName('a')), '', 5.0*$eps);
-        $this->assertEquals(exp(5.0), $this->predis->hget($this->hash, $rc->getEPreferenceName('a')), '', exp(5.0)*$eps);
+        $this->assertEquals(0, $this->predis->hget($this->hash, $rc->getPreferenceName('a')), '', $eps);
+        $this->assertEquals(1, $this->predis->hget($this->hash, $rc->getEPreferenceName('a')), '', $eps);
     }
 
     public function testThreeFrequentEqualActions() {
-        $rc = new ReinforcementComparison($this->predis, $this->hash, 0.1, 20, 0.01, 1.0);
+        $rc = new ReinforcementComparison($this->predis, $this->hash, 0.1, 0, 0.01, 1.0);
         $actions = ['a', 'b', 'c'];
         $calls = [0, 0, 0];
         foreach ($actions as $action)
@@ -123,14 +139,47 @@ class ReinforcementComparisonTest extends PHPUnit_Framework_TestCase {
             $calls[$rc->getBestActionIndex($actions)]++;
         }
 
-        echo "\n";
-        echo __CLASS__ . "::" . __FUNCTION__ . "\n";
-        echo "Reference reward: " . $this->predis->hget($this->hash, $rc->getReferenceRewardName()) . "\n";
-        for ($i = 0; $i < count($calls); $i++) {
-            echo "Action $actions[$i]: $calls[$i] times \n";
-            echo " preference: " . $this->predis->hget($this->hash, $rc->getPreferenceName($actions[$i])) . "\n";
-            echo " e-preference: " . $this->predis->hget($this->hash, $rc->getEPreferenceName($actions[$i])) . "\n";
+        $this->EchoStats($rc, $calls, $actions, __FUNCTION__);
+    }
+
+    public function testThreeFrequentEqualActionsOptimisticDefaultReferenceReward() {
+        $rc = new ReinforcementComparison($this->predis, $this->hash, 0.1, /*this*/20, 0.01, 1.0);
+        $actions = ['a', 'b', 'c'];
+        $calls = [0, 0, 0];
+        foreach ($actions as $action)
+            $rc->initAction($action);
+
+        for ($i = 0; $i < 10000; $i++) {
+            if ($this->predis->hget($this->hash, $rc->getChooseCountName('a')) == 2)
+                $rc->receiveReward('a', 10);
+            if ($this->predis->hget($this->hash, $rc->getChooseCountName('b')) == 2)
+                $rc->receiveReward('b', 10);
+            if ($this->predis->hget($this->hash, $rc->getChooseCountName('c')) == 1)
+                $rc->receiveReward('c', 5);
+            $calls[$rc->getBestActionIndex($actions)]++;
         }
+
+        $this->EchoStats($rc, $calls, $actions, __FUNCTION__);
+    }
+
+    public function testThreeFrequentAlmostEqualActionsOptimisticDefaultReferenceReward() {
+        $rc = new ReinforcementComparison($this->predis, $this->hash, 0.1, 0, 0.01, 1.0);
+        $actions = ['a', 'b', 'c'];
+        $calls = [0, 0, 0];
+        foreach ($actions as $action)
+            $rc->initAction($action);
+
+        for ($i = 0; $i < 10000; $i++) {
+            if ($this->predis->hget($this->hash, $rc->getChooseCountName('a')) == 2)
+                $rc->receiveReward('a', 10);
+            if ($this->predis->hget($this->hash, $rc->getChooseCountName('b')) == 2)
+                $rc->receiveReward('b', 10);
+            if ($this->predis->hget($this->hash, $rc->getChooseCountName('c')) == 1)
+                $rc->receiveReward('c', 4.9);
+            $calls[$rc->getBestActionIndex($actions)]++;
+        }
+
+        $this->EchoStats($rc, $calls, $actions, __FUNCTION__);
     }
 
     public function testThreeRareEqualActions() {
@@ -150,14 +199,7 @@ class ReinforcementComparisonTest extends PHPUnit_Framework_TestCase {
             $calls[$rc->getBestActionIndex($actions)]++;
         }
 
-        echo "\n";
-        echo __CLASS__ . "::" . __FUNCTION__ . "\n";
-        echo "Reference reward: " . $this->predis->hget($this->hash, $rc->getReferenceRewardName()) . "\n";
-        for ($i = 0; $i < count($calls); $i++) {
-            echo "Action $actions[$i]: $calls[$i] times \n";
-            echo " preference: " . $this->predis->hget($this->hash, $rc->getPreferenceName($actions[$i])) . "\n";
-            echo " e-preference: " . $this->predis->hget($this->hash, $rc->getEPreferenceName($actions[$i])) . "\n";
-        }
+        $this->EchoStats($rc, $calls, $actions, __FUNCTION__);
     }
 
     // TODO: why??
@@ -186,15 +228,7 @@ class ReinforcementComparisonTest extends PHPUnit_Framework_TestCase {
             $calls[$rc->getBestActionIndex($actions)]++;
         }
 
-        echo "\n";
-        echo __CLASS__ . "::" . __FUNCTION__ . "\n";
-        echo "Reference reward: " . $this->predis->hget($this->hash, $rc->getReferenceRewardName()) . "\n";
-        for ($i = 0; $i < count($calls); $i++) {
-            echo "Action $actions[$i]: $calls[$i] times \n";
-            echo " preference: " . $this->predis->hget($this->hash, $rc->getPreferenceName($actions[$i])) . "\n";
-            echo " e-preference: " . $this->predis->hget($this->hash, $rc->getEPreferenceName($actions[$i])) . "\n";
-        }
+        $this->EchoStats($rc, $calls, $actions, __FUNCTION__);
     }
-
     //TODO: temperature test
 }

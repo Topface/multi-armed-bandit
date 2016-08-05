@@ -73,19 +73,27 @@ class WeightedAverage extends AbstractPredisMultiArmedBandit {
     public function receiveReward($actionName, $reward) {
         $luaUpdater =
 "local moveCount = redis.call('hget', KEYS[1], KEYS[2])
+if tonumber(moveCount) == 0 then
+    redis.call('hincrby', KEYS[1], KEYS[3], ARGV[1])
+    return
+end
 redis.call('hset', KEYS[1], KEYS[2], 0)
-if tonumber(moveCount) == 0 then moveCount = 1 end
+local storedReward = redis.call('hget', KEYS[1], KEYS[3])
+if tonumber(storedReward) ~= 0 then
+    redis.call('hset', KEYS[1], KEYS[3], 0)
+end
+local reward = (ARGV[1] + storedReward) / moveCount
 
-local reward = ARGV[1] / moveCount
-local deltaValue = ARGV[2]*(reward - redis.call('hget', KEYS[1], KEYS[3]))
-redis.call('hincrbyfloat', KEYS[1], KEYS[3], deltaValue)";
+local deltaValue = ARGV[2]*(reward - redis.call('hget', KEYS[1], KEYS[4]))
+redis.call('hincrbyfloat', KEYS[1], KEYS[4], deltaValue)";
 
         $this->PredisStorage->eval(
             $luaUpdater,
-            3,
+            4,
 /*1_______*/$this->predisHashKey,
 /*2_______*/$this->getChooseCountName($actionName),
-/*3_______*/$this->getValueName($actionName),
+/*3_______*/$this->getStoredRewardName($actionName),
+/*4_______*/$this->getValueName($actionName),
             $reward,
             $this->step
         );

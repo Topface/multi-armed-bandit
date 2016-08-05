@@ -34,6 +34,7 @@ class WeightedAverageTest extends PHPUnit_Framework_TestCase {
         $wa->initAction('a');
         $this->assertEquals('v:a', $wa->getValueName('a'));
         $this->assertEquals('cc:a', $wa->getChooseCountName('a'));
+        $this->assertEquals('sr:a', $wa->getStoredRewardName('a'));
         $this->assertEquals(50, $this->predis->hget($this->hash, $wa->getValueName('a')));
         $this->assertEquals(0, $this->predis->hget($this->hash, $wa->getChooseCountName('a')));
     }
@@ -41,25 +42,20 @@ class WeightedAverageTest extends PHPUnit_Framework_TestCase {
     public function testOneAction() {
         $wa = new WeightedAverage($this->predis, $this->hash, 0.9, 0.1, 50, '');
         $wa->initAction('a');
-
-        // getBestAction() call with `$countAsMove == false` doesn't change move counter
-        $this->assertEquals(0, $this->predis->hget($this->hash, $wa->getChooseCountName('a')));
+        $eps = 1.0 / 1000 / 1000;
 
         // 0 moves, reward. This is a corner case, which should happen rarely as move count should be higher than reward count.
-        // To resolve this problem we assume that moveCount == 1.
-        $wa->receiveReward('a', 150);
-        $eps = 1.0 / 1000 / 1000;
+        // if `chooseCount` == 0 we store reward to `storedReward`, until next receiveReward() call
+        $wa->receiveReward('a', 75);
         $this->assertEquals(0, $this->predis->hget($this->hash, $wa->getChooseCountName('a')));
-        $this->assertEquals(60.0, $this->predis->hget($this->hash, $wa->getValueName('a')), '', 60.0 * $eps);
+        $this->assertEquals(50, $this->predis->hget($this->hash, $wa->getValueName('a')), '', 50 * $eps);
 
         // one move, then reward
         $this->assertEquals(0, $wa->getBestActionIndex(['a']));
         $this->assertEquals(1, $this->predis->hget($this->hash, $wa->getChooseCountName('a')));
-
-        $wa->receiveReward('a', 160);
-        $eps = 1.0 / 1000 / 1000;
+        $wa->receiveReward('a', 75);
         $this->assertEquals(0, $this->predis->hget($this->hash, $wa->getChooseCountName('a')));
-        $this->assertEquals(70.0, $this->predis->hget($this->hash, $wa->getValueName('a')), '', 70.0 * $eps);
+        $this->assertEquals(60.0, $this->predis->hget($this->hash, $wa->getValueName('a')), '', 60.0 * $eps);
 
         // Two moves, then reward
         $this->assertEquals(0, $wa->getBestActionIndex(['a']));
@@ -67,11 +63,9 @@ class WeightedAverageTest extends PHPUnit_Framework_TestCase {
         $this->assertEquals(0, $wa->getBestActionIndex(['a']));
         $this->assertEquals(2, $this->predis->hget($this->hash, $wa->getChooseCountName('a')));
 
-        $wa->receiveReward('a', 340);
-        $eps = 1.0 / 1000 / 1000;
-        $eps = 1.0 / 1000 / 1000;
+        $wa->receiveReward('a', 320);
         $this->assertEquals(0, $this->predis->hget($this->hash, $wa->getChooseCountName('a')));
-        $this->assertEquals(80.0, $this->predis->hget($this->hash, $wa->getValueName('a')), '', 80.0 * $eps);
+        $this->assertEquals(70.0, $this->predis->hget($this->hash, $wa->getValueName('a')), '', 70.0 * $eps);
     }
 
     public function testGreediness() {
@@ -90,12 +84,7 @@ class WeightedAverageTest extends PHPUnit_Framework_TestCase {
         $showCount = (10000 + 10000 * $greediness) / 2; // a + (1-a)/2 == (a+1)/2 == 9500
         $this->assertEquals($showCount, $calls[1], '', 0.05 * $showCount);
 
-        echo "\n";
-        echo __CLASS__ . "::" . __FUNCTION__ . "\n";
-        for ($i = 0; $i < count($calls); $i++) {
-            echo "Action $actions[$i]: $calls[$i] times \n";
-            echo " value: " . $this->predis->hget($this->hash, $wa->getValueName($actions[$i])) . "\n";
-        }
+        $this->EchoStats($wa, $calls, $actions, __FUNCTION__);
     }
 
     // TODO: write initActions()
@@ -116,12 +105,7 @@ class WeightedAverageTest extends PHPUnit_Framework_TestCase {
             $calls[$wa->getBestActionIndex($actions)]++;
         }
 
-        echo "\n";
-        echo __CLASS__ . "::" . __FUNCTION__ . "\n";
-        for ($i = 0; $i < count($calls); $i++) {
-            echo "Action $actions[$i]: $calls[$i] times \n";
-            echo " value: " . $this->predis->hget($this->hash, $wa->getValueName($actions[$i])) . "\n";
-        }
+        $this->EchoStats($wa, $calls, $actions, __FUNCTION__);
     }
 
     public function testThreeNonequalActions() {
@@ -141,8 +125,18 @@ class WeightedAverageTest extends PHPUnit_Framework_TestCase {
             $calls[$wa->getBestActionIndex($actions)]++;
         }
 
+        $this->EchoStats($wa, $calls, $actions, __FUNCTION__);
+    }
+
+    /**
+     * @param $wa WeightedAverage
+     * @param $calls []
+     * @param $actions []
+     * @param $methodName string
+     */
+    private function EchoStats($wa, $calls, $actions, $methodName) {
         echo "\n";
-        echo __CLASS__ . "::" . __FUNCTION__ . "\n";
+        echo __CLASS__ . "::" . $methodName . "\n";
         for ($i = 0; $i < count($calls); $i++) {
             echo "Action $actions[$i]: $calls[$i] times \n";
             echo " value: " . $this->predis->hget($this->hash, $wa->getValueName($actions[$i])) . "\n";
