@@ -2,7 +2,6 @@
 
 namespace MultiArmedBandit;
 
-// TODO: если movecount == 0, сохранять награду до следующего раза!
 /**
  * Epsilon-greey algorithm with weighted average action values for nonstationary problems.
  */
@@ -24,6 +23,25 @@ class WeightedAverage extends AbstractPredisMultiArmedBandit {
      * @var float
      */
     private $startingValue;
+
+    /**
+     * @var string
+     */
+    private $receiveRewardScript =
+"local moveCount = redis.call('hget', KEYS[1], KEYS[2])
+if tonumber(moveCount) == 0 then
+    redis.call('hincrby', KEYS[1], KEYS[3], ARGV[1])
+    return
+end
+redis.call('hset', KEYS[1], KEYS[2], 0)
+local storedReward = redis.call('hget', KEYS[1], KEYS[3])
+if tonumber(storedReward) ~= 0 then
+    redis.call('hset', KEYS[1], KEYS[3], 0)
+end
+local reward = (ARGV[1] + storedReward) / moveCount
+
+local deltaValue = ARGV[2]*(reward - redis.call('hget', KEYS[1], KEYS[4]))
+redis.call('hincrbyfloat', KEYS[1], KEYS[4], deltaValue)";
 
     /**
      * @param string $actionName
@@ -71,24 +89,12 @@ class WeightedAverage extends AbstractPredisMultiArmedBandit {
     }
 
     public function receiveReward($actionName, $reward) {
-        $luaUpdater =
-"local moveCount = redis.call('hget', KEYS[1], KEYS[2])
-if tonumber(moveCount) == 0 then
-    redis.call('hincrby', KEYS[1], KEYS[3], ARGV[1])
-    return
-end
-redis.call('hset', KEYS[1], KEYS[2], 0)
-local storedReward = redis.call('hget', KEYS[1], KEYS[3])
-if tonumber(storedReward) ~= 0 then
-    redis.call('hset', KEYS[1], KEYS[3], 0)
-end
-local reward = (ARGV[1] + storedReward) / moveCount
-
-local deltaValue = ARGV[2]*(reward - redis.call('hget', KEYS[1], KEYS[4]))
-redis.call('hincrbyfloat', KEYS[1], KEYS[4], deltaValue)";
-
-        $this->PredisStorage->eval(
-            $luaUpdater,
+        if (!$this->receiveRewardScriptLoaded) {
+            $this->receiveRewardScriptHash = $this->loadPredisScript($this->receiveRewardScript);
+            $this->receiveRewardScriptLoaded = true;
+        }
+        $this->PredisStorage->evalsha(
+            $this->receiveRewardScriptHash,
             4,
 /*1_______*/$this->predisHashKey,
 /*2_______*/$this->getChooseCountName($actionName),

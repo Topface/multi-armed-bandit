@@ -14,6 +14,24 @@ class ReinforcementComparison extends AbstractPredisMultiArmedBandit {
 
     private $temperature;
 
+    private $receiveRewardScript =
+"local moveCount = redis.call('hget', KEYS[1], KEYS[2])
+if tonumber(moveCount) == 0 then
+    redis.call('hincrby', KEYS[1], KEYS[3], ARGV[1])
+    return
+end
+redis.call('hset', KEYS[1], KEYS[2], 0)
+local storedReward = redis.call('hget', KEYS[1], KEYS[3])
+if tonumber(storedReward) ~= 0 then
+    redis.call('hset', KEYS[1], KEYS[3], 0)
+end
+local reward = (ARGV[1] + storedReward) / moveCount
+
+local deltaReward = reward - redis.call('hget', KEYS[1], KEYS[4])
+local res = redis.call('hincrbyfloat', KEYS[1], KEYS[4], ARGV[2]*deltaReward)
+local newPref = redis.call('hincrbyfloat', KEYS[1], KEYS[5], ARGV[3]*deltaReward)
+redis.call('hset', KEYS[1], KEYS[6], math.exp(newPref/ARGV[4]))";
+
     public function getReferenceRewardName() {
         return $this->prefix . 'rr';
     }
@@ -81,31 +99,14 @@ class ReinforcementComparison extends AbstractPredisMultiArmedBandit {
     public function receiveReward($actionName, $reward) {
         //TODO: вообще, проверить, что может сломаться, если на сервер упадет метеорит
         //TODO: хранить количество показов, чтобы знать активность группы
-        //TODO: removed "if preference == false then preference = 0 end", because we have initAction() => throw exceptions
         //TODO: test on redis cluster
-        // TODO: "if tonumber(moveCount) == 0 then moveCount = 1 end" or "if tonumber(moveCount) == 0 then return end" ?
 
-        $luaUpdater =
-            "local moveCount = redis.call('hget', KEYS[1], KEYS[2])
-if tonumber(moveCount) == 0 then
-    redis.call('hincrby', KEYS[1], KEYS[3], ARGV[1])
-    return
-end
-redis.call('hset', KEYS[1], KEYS[2], 0)
-local storedReward = redis.call('hget', KEYS[1], KEYS[3])
-if tonumber(storedReward) ~= 0 then
-    redis.call('hset', KEYS[1], KEYS[3], 0)
-end
-local reward = (ARGV[1] + storedReward) / moveCount
-
-local deltaReward = reward - redis.call('hget', KEYS[1], KEYS[4])
-local res = redis.call('hincrbyfloat', KEYS[1], KEYS[4], ARGV[2]*deltaReward)
-local newPref = redis.call('hincrbyfloat', KEYS[1], KEYS[5], ARGV[3]*deltaReward)
-redis.call('hset', KEYS[1], KEYS[6], math.exp(newPref/ARGV[4]))";
-
-        //TODO: use EVALSHA or something
-        return $this->PredisStorage->eval(
-            $luaUpdater,
+        if (!$this->receiveRewardScriptLoaded) {
+            $this->receiveRewardScriptHash = $this->loadPredisScript($this->receiveRewardScript);
+            $this->receiveRewardScriptLoaded = true;
+        }
+        $this->PredisStorage->evalsha(
+            $this->receiveRewardScriptHash,
             6,
 /*1_______*/$this->predisHashKey,
 /*2_______*/$this->getChooseCountName($actionName),

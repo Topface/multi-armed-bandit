@@ -21,6 +21,13 @@ abstract class AbstractPredisMultiArmedBandit extends AbstractMultiArmedBandit {
      */
     protected $prefix;
 
+    /**
+     * @var bool
+     */
+    protected $receiveRewardScriptLoaded = false;
+
+    protected $receiveRewardScriptHash;
+
     public function getChooseCountName($actionName){
         return $this->prefix . 'cc:' . $actionName;
     }
@@ -47,5 +54,20 @@ abstract class AbstractPredisMultiArmedBandit extends AbstractMultiArmedBandit {
     public function initAction($actionName) {
         $this->PredisStorage->hset($this->predisHashKey, $this->getChooseCountName($actionName), 0);
         $this->PredisStorage->hset($this->predisHashKey, $this->getStoredRewardName($actionName), 0);
+    }
+
+    /**
+     * @param $script
+     * @return mixed
+     */
+    protected function loadPredisScript($script) {
+        $success = false;
+        $hash = apcu_fetch($script, $success);
+        if ($success && $this->PredisStorage->script('EXISTS', $hash)[0])
+            return $hash;
+
+        $hash = $this->PredisStorage->script('load', $script);
+        apcu_store($script, $hash);
+        return $hash;
     }
 }
