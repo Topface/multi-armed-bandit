@@ -58,9 +58,9 @@ class ReinforcementComparisonTest extends PHPUnit_Framework_TestCase {
     public function testEvalsha() {
         $this->predis->script('flush');
         $eps =1.0/1000/1000;
+
         $rc = new ReinforcementComparison($this->predis, $this->hash);
         $rc->initAction('a');
-
         $rc->getBestActionIndex(['a']);
         $rc->receiveReward('a', 100);
         $this->assertEquals(10.0, $this->predis->hget($this->hash, $rc->getReferenceRewardName()), '', 10.0*$eps);
@@ -68,17 +68,17 @@ class ReinforcementComparisonTest extends PHPUnit_Framework_TestCase {
         // get hash from apc
         $rc = new ReinforcementComparison($this->predis, $this->hash);
         $rc->initAction('a');
-
         $rc->getBestActionIndex(['a']);
         $rc->receiveReward('a', 100);
         $this->assertEquals(10.0, $this->predis->hget($this->hash, $rc->getReferenceRewardName()), '', 10.0*$eps);
 
         //TODO: should we support this?
-//        $this->predis->script('flush');
-//        $rc->receiveReward('a', 100);
-//        $this->assertEquals(19.0, $this->predis->hget($this->hash, $rc->getReferenceRewardName()), '', 19.0*$eps);
+        $this->predis->script('flush');
+        $rc->getBestActionIndex(['a']);
+        $rc->receiveReward('a', 100);
+        $this->assertEquals(19.0, $this->predis->hget($this->hash, $rc->getReferenceRewardName()), '', 19.0 * $eps);
     }
-    
+
     public function testInitialization() {
         $rc = new ReinforcementComparison($this->predis, $this->hash);
 

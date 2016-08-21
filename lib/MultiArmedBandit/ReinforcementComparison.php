@@ -32,6 +32,11 @@ local res = redis.call('hincrbyfloat', KEYS[1], KEYS[4], ARGV[2]*deltaReward)
 local newPref = redis.call('hincrbyfloat', KEYS[1], KEYS[5], ARGV[3]*deltaReward)
 redis.call('hset', KEYS[1], KEYS[6], math.exp(newPref/ARGV[4]))";
 
+    /**
+     * @var PredisSctiptHelper
+     */
+    private $PredisScriptHelper;
+
     public function getReferenceRewardName() {
         return $this->prefix . 'rr';
     }
@@ -101,12 +106,8 @@ redis.call('hset', KEYS[1], KEYS[6], math.exp(newPref/ARGV[4]))";
         //TODO: хранить количество показов, чтобы знать активность группы
         //TODO: test on redis cluster
 
-        if (!$this->receiveRewardScriptLoaded) {
-            $this->receiveRewardScriptHash = $this->loadPredisScript($this->receiveRewardScript);
-            $this->receiveRewardScriptLoaded = true;
-        }
-        $this->PredisStorage->evalsha(
-            $this->receiveRewardScriptHash,
+        $evalshaArgs = [
+            null,           //script hash goes here
             6,
 /*1_______*/$this->predisHashKey,
 /*2_______*/$this->getChooseCountName($actionName),
@@ -118,6 +119,10 @@ redis.call('hset', KEYS[1], KEYS[6], math.exp(newPref/ARGV[4]))";
             $this->referenceRewardStep,
             $this->preferenceStep,
             $this->temperature
-        );
+        ];
+
+        if (!isset($this->PredisScriptHelper))
+            $this->PredisScriptHelper = new PredisSctiptHelper($this->PredisStorage, $this->receiveRewardScript);
+        $this->PredisScriptHelper->evalsha($evalshaArgs);
     }
 }

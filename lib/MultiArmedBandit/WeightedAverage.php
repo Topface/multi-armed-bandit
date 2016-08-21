@@ -2,6 +2,8 @@
 
 namespace MultiArmedBandit;
 
+use Predis\Client;
+
 /**
  * Epsilon-greey algorithm with weighted average action values for nonstationary problems.
  */
@@ -44,6 +46,11 @@ local deltaValue = ARGV[2]*(reward - redis.call('hget', KEYS[1], KEYS[4]))
 redis.call('hincrbyfloat', KEYS[1], KEYS[4], deltaValue)";
 
     /**
+     * @var PredisSctiptHelper
+     */
+    private $PredisScriptHelper;
+
+    /**
      * @param string $actionName
      * @return string
      */
@@ -52,7 +59,7 @@ redis.call('hincrbyfloat', KEYS[1], KEYS[4], deltaValue)";
     }
 
     /**
-     * @param \Predis\Client $PredisStorage
+     * @param Client $PredisStorage
      * @param string $predisHashKey
      * @param float $greediness
      * @param float $step
@@ -89,12 +96,8 @@ redis.call('hincrbyfloat', KEYS[1], KEYS[4], deltaValue)";
     }
 
     public function receiveReward($actionName, $reward) {
-        if (!$this->receiveRewardScriptLoaded) {
-            $this->receiveRewardScriptHash = $this->loadPredisScript($this->receiveRewardScript);
-            $this->receiveRewardScriptLoaded = true;
-        }
-        $this->PredisStorage->evalsha(
-            $this->receiveRewardScriptHash,
+        $evalshaArgs = [
+            null,           //script hash goes here
             4,
 /*1_______*/$this->predisHashKey,
 /*2_______*/$this->getChooseCountName($actionName),
@@ -102,7 +105,11 @@ redis.call('hincrbyfloat', KEYS[1], KEYS[4], deltaValue)";
 /*4_______*/$this->getValueName($actionName),
             $reward,
             $this->step
-        );
+        ];
+
+        if (!isset($this->PredisScriptHelper))
+            $this->PredisScriptHelper = new PredisSctiptHelper($this->PredisStorage, $this->receiveRewardScript);
+        $this->PredisScriptHelper->evalsha($evalshaArgs);
     }
 
     /**
