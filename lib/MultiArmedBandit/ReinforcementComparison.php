@@ -83,18 +83,15 @@ redis.call('hset', KEYS[1], KEYS[6], math.exp(newPref/ARGV[4]))";
     }
 
     public function getBestActionIndex(array $actionNames) {
-        $softmaxWeightNames = array_map(
-            function($val) { return $this->getEPreferenceName($val); },
-            $actionNames
-        );
+        $softmaxWeightNames = [];
+        foreach ($actionNames as $action) {
+            $softmaxWeightNames[] = $this->getEPreferenceName($action);
+        }
         $softmaxWeights = $this->PredisStorage->hmget($this->predisHashKey, $softmaxWeightNames);
         $softmaxSum = array_sum($softmaxWeights);
-        $softmaxWeights = array_map (
-            function($el) use($softmaxSum) {
-                return $el / $softmaxSum;
-            },
-            $softmaxWeights
-        );
+        foreach ($softmaxWeights as &$softmaxWeight) {
+            $softmaxWeight /= $softmaxSum;
+        }
         $actionIndex = self::getRandomByProbability($softmaxWeights);
 
         $this->PredisStorage->hincrby($this->predisHashKey, $this->getChooseCountName($actionNames[$actionIndex]), 1);

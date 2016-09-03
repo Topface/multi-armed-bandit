@@ -117,10 +117,10 @@ redis.call('hincrbyfloat', KEYS[1], KEYS[4], deltaValue)";
      * @return int
      */
     private function greedyAction($actionNames) {
-        $valueNames = array_map(
-            function($action) { return $this->getValueName($action); },
-            $actionNames
-        );
+        $valueNames = [];
+        foreach ($actionNames as $action) {
+            $valueNames[] = $this->getValueName($action);
+        }
         $values = $this->PredisStorage->hmget($this->predisHashKey, $valueNames);
         $highestValues = array_keys($values, max($values));
         return (count($highestValues) > 1) ?
