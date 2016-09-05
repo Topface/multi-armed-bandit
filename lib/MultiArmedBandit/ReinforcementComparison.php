@@ -92,6 +92,7 @@ redis.call('hset', KEYS[1], KEYS[6], math.exp(newPref/ARGV[4]))";
         foreach ($softmaxWeights as &$softmaxWeight) {
             $softmaxWeight /= $softmaxSum;
         }
+        unset($softmaxWeight);
         $actionIndex = self::getRandomByProbability($softmaxWeights);
 
         $this->PredisStorage->hincrby($this->predisHashKey, $this->getChooseCountName($actionNames[$actionIndex]), 1);

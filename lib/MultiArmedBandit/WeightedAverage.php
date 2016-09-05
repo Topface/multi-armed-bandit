@@ -124,11 +124,11 @@ redis.call('hincrbyfloat', KEYS[1], KEYS[4], deltaValue)";
         $values = $this->PredisStorage->hmget($this->predisHashKey, $valueNames);
         $highestValues = array_keys($values, max($values));
         return (count($highestValues) > 1) ?
-            $actionIndex = $highestValues[rand(0, count($highestValues) - 1)] :
+            $actionIndex = $highestValues[array_rand($highestValues)] :
             $highestValues[0];
     }
 
     private function randomAction($actionNames) {
-        return rand(0, count($actionNames) - 1);
+        return array_rand($actionNames);
     }
 }

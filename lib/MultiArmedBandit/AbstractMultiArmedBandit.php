@@ -36,10 +36,13 @@ abstract class AbstractMultiArmedBandit {
         $sum = array_sum($actionProbabilities);
         $chance = rand() / getrandmax() * $sum;
 
-        for ($i = 0; $i < count($actionProbabilities) && $chance > 0; $i++) {
-            $chance -= $actionProbabilities[$i];
+        $actionIndex = 0;
+        foreach ($actionProbabilities as $actionIndex => $actionProbability) {
+            $chance -= $actionProbability;
+            if ($chance <= 0)
+                break;
         }
-        return $i - 1;
+        return $actionIndex;
     }
 
     /**
