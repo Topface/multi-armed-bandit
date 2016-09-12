@@ -123,4 +123,9 @@ redis.call('hset', KEYS[1], KEYS[6], math.exp(newPref/ARGV[4]))";
             $this->PredisScriptHelper = new PredisSctiptHelper($this->PredisStorage, $this->receiveRewardScript);
         $this->PredisScriptHelper->evalsha($evalshaArgs);
     }
+
+    public function getActionState($actionName) {
+        // TODO: Implement getActionState() method.
+        throw new \BadMethodCallException('Not implemented');
+    }
 }

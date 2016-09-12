@@ -112,6 +112,11 @@ redis.call('hincrbyfloat', KEYS[1], KEYS[4], deltaValue)";
         $this->PredisScriptHelper->evalsha($evalshaArgs);
     }
 
+    public function getActionState($actionName) {
+        $value = $this->PredisStorage->hget($this->predisHashKey, $this->getValueName($actionName));
+        return ['weightedAverage' => $value];
+    }
+
     /**
      * @param $actionNames
      * @return int

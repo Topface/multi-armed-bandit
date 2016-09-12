@@ -28,6 +28,11 @@ abstract class AbstractMultiArmedBandit {
     public abstract function receiveReward($actionName, $reward);
 
     /**
+     * @param $actionName
+     */
+    public abstract function getActionState($actionName);
+
+    /**
      * Given an array of probabilities of actions chooses one and returns it's index.
      * @param array $actionProbabilities
      * @return int

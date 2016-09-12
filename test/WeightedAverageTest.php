@@ -128,6 +128,15 @@ class WeightedAverageTest extends PHPUnit_Framework_TestCase {
         $this->EchoStats($wa, $calls, $actions, __FUNCTION__);
     }
 
+    public function testGetActionState() {
+        $wa = new WeightedAverage($this->predis, $this->hash, 0.9, 0.1, 50, 'itsaprefix');
+
+        $wa->initAction('a');
+        $actionState = $wa->getActionState('a');
+        $this->assertEquals(1, count($actionState));
+        $this->assertEquals(50, $actionState['weightedAverage']);
+    }
+
     /**
      * @param $wa WeightedAverage
      * @param $calls []
