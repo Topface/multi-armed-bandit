@@ -14,8 +14,8 @@ class ReinforcementComparison extends AbstractPredisMultiArmedBandit {
 
     private $temperature;
 
-    private $receiveRewardScript =
-"local moveCount = redis.call('hget', KEYS[1], KEYS[2])
+    private $receiveRewardScript =<<<SCRIPT
+local moveCount = redis.call('hget', KEYS[1], KEYS[2])
 if tonumber(moveCount) == 0 then
     redis.call('hincrby', KEYS[1], KEYS[3], ARGV[1])
     return
@@ -30,7 +30,8 @@ local reward = (ARGV[1] + storedReward) / moveCount
 local deltaReward = reward - redis.call('hget', KEYS[1], KEYS[4])
 local res = redis.call('hincrbyfloat', KEYS[1], KEYS[4], ARGV[2]*deltaReward)
 local newPref = redis.call('hincrbyfloat', KEYS[1], KEYS[5], ARGV[3]*deltaReward)
-redis.call('hset', KEYS[1], KEYS[6], math.exp(newPref/ARGV[4]))";
+redis.call('hset', KEYS[1], KEYS[6], math.exp(newPref/ARGV[4]))
+SCRIPT;
 
     /**
      * @var PredisSctiptHelper
@@ -119,8 +120,9 @@ redis.call('hset', KEYS[1], KEYS[6], math.exp(newPref/ARGV[4]))";
             $this->temperature
         ];
 
-        if (!isset($this->PredisScriptHelper))
+        if (!isset($this->PredisScriptHelper)) {
             $this->PredisScriptHelper = new PredisSctiptHelper($this->PredisStorage, $this->receiveRewardScript);
+        }
         $this->PredisScriptHelper->evalsha($evalshaArgs);
     }
 

@@ -29,8 +29,8 @@ class WeightedAverage extends AbstractPredisMultiArmedBandit {
     /**
      * @var string
      */
-    private $receiveRewardScript =
-"local moveCount = redis.call('hget', KEYS[1], KEYS[2])
+    private $receiveRewardScript = <<<SCRIPT
+local moveCount = redis.call('hget', KEYS[1], KEYS[2])
 if tonumber(moveCount) == 0 then
     redis.call('hincrby', KEYS[1], KEYS[3], ARGV[1])
     return
@@ -43,7 +43,8 @@ end
 local reward = (ARGV[1] + storedReward) / moveCount
 
 local deltaValue = ARGV[2]*(reward - redis.call('hget', KEYS[1], KEYS[4]))
-redis.call('hincrbyfloat', KEYS[1], KEYS[4], deltaValue)";
+redis.call('hincrbyfloat', KEYS[1], KEYS[4], deltaValue)
+SCRIPT;
 
     /**
      * @var PredisSctiptHelper
