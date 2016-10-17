@@ -47,7 +47,7 @@ redis.call('hincrbyfloat', KEYS[1], KEYS[4], deltaValue)
 SCRIPT;
 
     /**
-     * @var PredisSctiptHelper
+     * @var PredisScriptHelper
      */
     private $PredisScriptHelper;
 
@@ -109,7 +109,7 @@ SCRIPT;
         ];
 
         if (!isset($this->PredisScriptHelper))
-            $this->PredisScriptHelper = new PredisSctiptHelper($this->PredisStorage, $this->receiveRewardScript);
+            $this->PredisScriptHelper = new PredisScriptHelper($this->PredisStorage, $this->receiveRewardScript);
         $this->PredisScriptHelper->evalsha($evalshaArgs);
     }
 

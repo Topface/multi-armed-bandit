@@ -34,7 +34,7 @@ redis.call('hset', KEYS[1], KEYS[6], math.exp(newPref/ARGV[4]))
 SCRIPT;
 
     /**
-     * @var PredisSctiptHelper
+     * @var PredisScriptHelper
      */
     private $PredisScriptHelper;
 
@@ -121,7 +121,7 @@ SCRIPT;
         ];
 
         if (!isset($this->PredisScriptHelper)) {
-            $this->PredisScriptHelper = new PredisSctiptHelper($this->PredisStorage, $this->receiveRewardScript);
+            $this->PredisScriptHelper = new PredisScriptHelper($this->PredisStorage, $this->receiveRewardScript);
         }
         $this->PredisScriptHelper->evalsha($evalshaArgs);
     }

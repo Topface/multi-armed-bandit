@@ -5,7 +5,7 @@ namespace MultiArmedBandit;
 use Predis\Client;
 use Predis\Response\ServerException;
 
-class PredisSctiptHelper {
+class PredisScriptHelper {
     private $Predis;
     private $script;
     private $scriptHash;
