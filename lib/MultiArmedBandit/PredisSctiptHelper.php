@@ -12,11 +12,11 @@ class PredisSctiptHelper {
 
     /**
      * PredisSctiptHelper constructor.
-     * @param $Predis Client
-     * @param $script string
-     * @param null $scriptHash string
+     * @param Client        $Predis
+     * @param string        $script
+     * @param string|null   $scriptHash
      */
-    public function __construct($Predis, $script, $scriptHash = null) {
+    public function __construct(Client $Predis, string $script, string $scriptHash = null) {
         if (!isset($scriptHash))
             $scriptHash = sha1($script);
 
@@ -26,10 +26,10 @@ class PredisSctiptHelper {
     }
 
     /**
-     * @param $evalshaArgs [] Fills 0'th element with script hash
+     * @param array     $evalshaArgs Fills 0'th element with script hash
      * @throws ServerException
      */
-    public function evalsha($evalshaArgs) {
+    public function evalsha(array $evalshaArgs) {
         $evalshaArgs[0] = $this->scriptHash;
         try {
             $this->Predis->evalsha(...$evalshaArgs);
@@ -40,6 +40,5 @@ class PredisSctiptHelper {
             $this->Predis->script('load', $this->script);
             $this->Predis->evalsha(...$evalshaArgs);
         }
-
     }
 }
