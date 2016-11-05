@@ -21,6 +21,10 @@ abstract class AbstractPredisMultiArmedBandit extends AbstractMultiArmedBandit {
      */
     protected $group;
 
+    public static function removeLearningData(Client $PredisStorage, string $learning) {
+        $PredisStorage->del($learning);
+    }
+
     public function getChooseCountName($actionName){
         return $this->group . 'cc:' . $actionName;
     }
