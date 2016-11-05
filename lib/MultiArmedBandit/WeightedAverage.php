@@ -56,12 +56,12 @@ SCRIPT;
      * @return string
      */
     public function getValueName($actionName) {
-        return $this->prefix . "v:" . $actionName;
+        return $this->group . "v:" . $actionName;
     }
 
     /**
      * @param Client $PredisStorage
-     * @param string $predisHashKey
+     * @param string $learning
      * @param float $greediness
      * @param float $step
      * @param float $startingValue
@@ -69,13 +69,13 @@ SCRIPT;
      */
     public function __construct(
         $PredisStorage,
-        $predisHashKey,
+        $learning,
         $greediness = 0.9,
         $step = 0.1,    //TODO: best default value
         $startingValue = 0.0,
         $prefix = ''
     ) {
-        parent::__construct($PredisStorage, $predisHashKey, $prefix);
+        parent::__construct($PredisStorage, $learning, $prefix);
         $this->greediness = $greediness;
         $this->step = $step;
         $this->startingValue = $startingValue;
@@ -83,7 +83,7 @@ SCRIPT;
 
     public function initAction($actionName) {
         parent::initAction($actionName);
-        $this->PredisStorage->hset($this->predisHashKey, $this->getValueName($actionName), $this->startingValue);
+        $this->PredisStorage->hset($this->learning, $this->getValueName($actionName), $this->startingValue);
     }
 
     public function getBestActionIndex(array $actionNames) {
@@ -92,7 +92,7 @@ SCRIPT;
         $actionIndex = $actionTypeIndex == 0 ?
             $this->greedyAction($actionNames) :
             $this->randomAction($actionNames);
-        $this->PredisStorage->hincrby($this->predisHashKey, $this->getChooseCountName($actionNames[$actionIndex]), 1);
+        $this->PredisStorage->hincrby($this->learning, $this->getChooseCountName($actionNames[$actionIndex]), 1);
         return $actionIndex;
     }
 
@@ -100,7 +100,7 @@ SCRIPT;
         $evalshaArgs = [
             null,           //script hash goes here
             4,
-/*1_______*/$this->predisHashKey,
+/*1_______*/$this->learning,
 /*2_______*/$this->getChooseCountName($actionName),
 /*3_______*/$this->getStoredRewardName($actionName),
 /*4_______*/$this->getValueName($actionName),
@@ -114,7 +114,7 @@ SCRIPT;
     }
 
     public function getActionState($actionName) {
-        $value = $this->PredisStorage->hget($this->predisHashKey, $this->getValueName($actionName));
+        $value = $this->PredisStorage->hget($this->learning, $this->getValueName($actionName));
         return ['weightedAverage' => $value];
     }
 
@@ -127,7 +127,7 @@ SCRIPT;
         foreach ($actionNames as $action) {
             $valueNames[] = $this->getValueName($action);
         }
-        $values = $this->PredisStorage->hmget($this->predisHashKey, $valueNames);
+        $values = $this->PredisStorage->hmget($this->learning, $valueNames);
         $highestValues = array_keys($values, max($values));
         return (count($highestValues) > 1) ?
             $actionIndex = $highestValues[array_rand($highestValues)] :

@@ -14,38 +14,38 @@ abstract class AbstractPredisMultiArmedBandit extends AbstractMultiArmedBandit {
     /**
      * @var string Used to run several experiments simultaniously
      */
-    protected $predisHashKey;
+    protected $learning;
 
     /**
      * @var string Used to divide users by groups within one experiment
      */
-    protected $prefix;
+    protected $group;
 
     public function getChooseCountName($actionName){
-        return $this->prefix . 'cc:' . $actionName;
+        return $this->group . 'cc:' . $actionName;
     }
 
     public function getStoredRewardName($actionName) {
-        return $this->prefix . 'sr:' . $actionName;
+        return $this->group . 'sr:' . $actionName;
     }
 
     /**
      * @param Client $PredisStorage
-     * @param string $predisHashKey
-     * @param string $prefix
+     * @param string $learning
+     * @param string $group
      */
     public function __construct(
         Client $PredisStorage,
-        $predisHashKey,
-        $prefix
+        string $learning,
+        string $group
     ) {
-        $this->PredisStorage = $PredisStorage;
-        $this->predisHashKey = $predisHashKey;
-        $this->prefix = $prefix;
+        $this->PredisStorage    = $PredisStorage;
+        $this->learning         = $learning;
+        $this->group            = $group;
     }
     
     public function initAction($actionName) {
-        $this->PredisStorage->hset($this->predisHashKey, $this->getChooseCountName($actionName), 0);
-        $this->PredisStorage->hset($this->predisHashKey, $this->getStoredRewardName($actionName), 0);
+        $this->PredisStorage->hset($this->learning, $this->getChooseCountName($actionName), 0);
+        $this->PredisStorage->hset($this->learning, $this->getStoredRewardName($actionName), 0);
     }
 }

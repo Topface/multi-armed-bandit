@@ -39,48 +39,48 @@ SCRIPT;
     private $PredisScriptHelper;
 
     public function getReferenceRewardName() {
-        return $this->prefix . 'rr';
+        return $this->group . 'rr';
     }
 
     public function getPreferenceName($actionName) {
-        return $this->prefix . 'p:' . $actionName;
+        return $this->group . 'p:' . $actionName;
     }
 
     public function getEPreferenceName($actionName) {
-        return $this->prefix . 'ep:' . $actionName;
+        return $this->group . 'ep:' . $actionName;
     }
 
     /**
      * ReinforcementComparison constructor.
      * @param Client $PredisStorage
-     * @param string $predisHashKey
+     * @param string $learning
      * @param float $referenceRewardStep
      * @param float $startingReferenceReward
-     * @param float $preferenceStep
+     * @param float $preferenceDiscountingStep
      * @param float $temperature
      * @param string $prefix
      */
     public function __construct(
         Client $PredisStorage,
-        $predisHashKey,
+        $learning,
         $referenceRewardStep = 0.1,
         $startingReferenceReward = 0.0,
-        $preferenceStep = 0.1,
+        $preferenceDiscountingStep = 0.1,
         $temperature = 1.0,
         $prefix = ''
     ) {
-        parent::__construct($PredisStorage, $predisHashKey, $prefix);
+        parent::__construct($PredisStorage, $learning, $prefix);
         $this->referenceRewardStep = $referenceRewardStep;
         $this->startingReferenceReward = $startingReferenceReward;
-        $this->preferenceStep = $preferenceStep;
+        $this->preferenceStep = $preferenceDiscountingStep;
         $this->temperature = $temperature;
     }
 
     public function initAction($actionName) {
         parent::initAction($actionName);
-        $this->PredisStorage->hset($this->predisHashKey, $this->getReferenceRewardName(), $this->startingReferenceReward);
-        $this->PredisStorage->hset($this->predisHashKey, $this->getPreferenceName($actionName), 0);
-        $this->PredisStorage->hset($this->predisHashKey, $this->getEPreferenceName($actionName), 1);
+        $this->PredisStorage->hset($this->learning, $this->getReferenceRewardName(), $this->startingReferenceReward);
+        $this->PredisStorage->hset($this->learning, $this->getPreferenceName($actionName), 0);
+        $this->PredisStorage->hset($this->learning, $this->getEPreferenceName($actionName), 1);
     }
 
     public function getBestActionIndex(array $actionNames) {
@@ -88,7 +88,7 @@ SCRIPT;
         foreach ($actionNames as $action) {
             $softmaxWeightNames[] = $this->getEPreferenceName($action);
         }
-        $softmaxWeights = $this->PredisStorage->hmget($this->predisHashKey, $softmaxWeightNames);
+        $softmaxWeights = $this->PredisStorage->hmget($this->learning, $softmaxWeightNames);
         $softmaxSum = array_sum($softmaxWeights);
         foreach ($softmaxWeights as &$softmaxWeight) {
             $softmaxWeight /= $softmaxSum;
@@ -96,7 +96,7 @@ SCRIPT;
         unset($softmaxWeight);
         $actionIndex = self::getRandomByProbability($softmaxWeights);
 
-        $this->PredisStorage->hincrby($this->predisHashKey, $this->getChooseCountName($actionNames[$actionIndex]), 1);
+        $this->PredisStorage->hincrby($this->learning, $this->getChooseCountName($actionNames[$actionIndex]), 1);
         return $actionIndex;
     }
 
@@ -108,7 +108,7 @@ SCRIPT;
         $evalshaArgs = [
             null,           //script hash goes here
             6,
-/*1_______*/$this->predisHashKey,
+/*1_______*/$this->learning,
 /*2_______*/$this->getChooseCountName($actionName),
 /*3_______*/$this->getStoredRewardName($actionName),
 /*4_______*/$this->getReferenceRewardName(),
