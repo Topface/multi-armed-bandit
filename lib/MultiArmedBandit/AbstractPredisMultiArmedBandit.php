@@ -21,22 +21,34 @@ abstract class AbstractPredisMultiArmedBandit extends AbstractMultiArmedBandit {
      */
     protected $group;
 
+    /**
+     * @param Client    $PredisStorage
+     * @param string    $learning
+     */
     public static function removeLearningData(Client $PredisStorage, string $learning) {
         $PredisStorage->del($learning);
     }
 
-    public function getChooseCountName($actionName){
+    /**
+     * @param string    $actionName
+     * @return string
+     */
+    public function getChooseCountName(string $actionName){
         return $this->group . 'cc:' . $actionName;
     }
 
-    public function getStoredRewardName($actionName) {
+    /**
+     * @param string    $actionName
+     * @return string
+     */
+    public function getStoredRewardName(string $actionName) {
         return $this->group . 'sr:' . $actionName;
     }
 
     /**
-     * @param Client $PredisStorage
-     * @param string $learning
-     * @param string $group
+     * @param Client    $PredisStorage
+     * @param string    $learning
+     * @param string    $group
      */
     public function __construct(
         Client $PredisStorage,
@@ -47,8 +59,11 @@ abstract class AbstractPredisMultiArmedBandit extends AbstractMultiArmedBandit {
         $this->learning         = $learning;
         $this->group            = $group;
     }
-    
-    public function initAction($actionName) {
+
+    /**
+     * @param string    $actionName
+     */
+    public function initAction(string $actionName) {
         $this->PredisStorage->hset($this->learning, $this->getChooseCountName($actionName), 0);
         $this->PredisStorage->hset($this->learning, $this->getStoredRewardName($actionName), 0);
     }

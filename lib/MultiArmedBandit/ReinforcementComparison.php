@@ -61,13 +61,13 @@ SCRIPT;
      * @param string $prefix
      */
     public function __construct(
-        Client $PredisStorage,
-        $learning,
-        $referenceRewardStep = 0.1,
-        $startingReferenceReward = 0.0,
-        $preferenceDiscountingStep = 0.1,
-        $temperature = 1.0,
-        $prefix = ''
+        Client  $PredisStorage,
+        string  $learning,
+        float   $referenceRewardStep = 0.1,
+        float   $startingReferenceReward = 0.0,
+        float   $preferenceDiscountingStep = 0.1,
+        float   $temperature = 1.0,
+        string  $prefix = ''
     ) {
         parent::__construct($PredisStorage, $learning, $prefix);
         $this->referenceRewardStep = $referenceRewardStep;
@@ -76,7 +76,7 @@ SCRIPT;
         $this->temperature = $temperature;
     }
 
-    public function initAction($actionName) {
+    public function initAction(string $actionName) {
         parent::initAction($actionName);
         $this->PredisStorage->hset($this->learning, $this->getReferenceRewardName(), $this->startingReferenceReward);
         $this->PredisStorage->hset($this->learning, $this->getPreferenceName($actionName), 0);
@@ -100,7 +100,7 @@ SCRIPT;
         return $actionIndex;
     }
 
-    public function receiveReward($actionName, $reward) {
+    public function receiveReward(string $actionName, float $reward) {
         //TODO: вообще, проверить, что может сломаться, если на сервер упадет метеорит
         //TODO: хранить количество показов, чтобы знать активность группы
         //TODO: test on redis cluster
@@ -126,7 +126,7 @@ SCRIPT;
         $this->PredisScriptHelper->evalsha($evalshaArgs);
     }
 
-    public function getActionState($actionName) {
+    public function getActionState(string $actionName) {
         // TODO: Implement getActionState() method.
         throw new \BadMethodCallException('Not implemented');
     }

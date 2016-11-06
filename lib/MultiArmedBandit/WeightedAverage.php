@@ -55,7 +55,7 @@ SCRIPT;
      * @param string $actionName
      * @return string
      */
-    public function getValueName($actionName) {
+    public function getValueName(string $actionName) {
         return $this->group . "v:" . $actionName;
     }
 
@@ -81,7 +81,7 @@ SCRIPT;
         $this->startingValue = $startingValue;
     }
 
-    public function initAction($actionName) {
+    public function initAction(string $actionName) {
         parent::initAction($actionName);
         $this->PredisStorage->hset($this->learning, $this->getValueName($actionName), $this->startingValue);
     }
@@ -96,7 +96,7 @@ SCRIPT;
         return $actionIndex;
     }
 
-    public function receiveReward($actionName, $reward) {
+    public function receiveReward(string $actionName, float $reward) {
         $evalshaArgs = [
             null,           //script hash goes here
             4,
@@ -113,7 +113,7 @@ SCRIPT;
         $this->PredisScriptHelper->evalsha($evalshaArgs);
     }
 
-    public function getActionState($actionName) {
+    public function getActionState(string $actionName) {
         $value = $this->PredisStorage->hget($this->learning, $this->getValueName($actionName));
         return ['weightedAverage' => $value];
     }
@@ -122,7 +122,7 @@ SCRIPT;
      * @param $actionNames
      * @return int
      */
-    private function greedyAction($actionNames) {
+    private function greedyAction(array $actionNames) {
         $valueNames = [];
         foreach ($actionNames as $action) {
             $valueNames[] = $this->getValueName($action);
@@ -134,7 +134,7 @@ SCRIPT;
             $highestValues[0];
     }
 
-    private function randomAction($actionNames) {
+    private function randomAction(array $actionNames) {
         return array_rand($actionNames);
     }
 }
